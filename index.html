@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extract MRZ with Tesseract and OpenCV</title>
+
+    <script src="js/jquery-3.7.0.min.js"></script>
+    <!-- v4 -->
+    <script src='js/tesseract.min.js'></script>
+    <script src="js/mrz-helper.js"></script>
+</head>
+<body>
+    <div>
+    <p id="status">OpenCV.js is loading...</p>
+        <main className="App-main">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div style="display: flex; justify-content: center; width: 100%;">
+                    <div style="visibility: hidden; position: fixed;">
+                        <h3>Actual image uploaded</h3>
+                        <div style="width: 100%; border: 1px solid black; text-align: center;">
+                            <img id="passport-img" height="auto" />
+                        </div>
+                    </div>
+                    <div style="width: 100%; padding-left: 5rem; padding-right: 5rem;">
+                        <h3>Adjusted image</h3>
+                        <div id="image" style="width: 100%; border: 1px solid black; text-align: center; cursor: pointer;">
+                            <canvas id="adjusted-img" style="width:fit-content; min-height:500px; height:auto;" ></canvas>
+                        </div>
+                    </div>
+                </div>
+                <h3>Extracted text</h3>
+                <div class="text-box">
+                    <textarea id="extracted-text" style="width: 350px;"></textarea>
+                </div>
+                <input id="file" type="file" style="display: none;" onChange="handleChange(event)" />
+            </div>
+        </main>
+    </div>
+    <script>
+        let imgElement = document.getElementById("passport-img");
+        let adjustElement = document.getElementById("adjusted-img");
+        let textElement = document.getElementById("extracted-text");
+        let file;
+
+        $("div[id='image']").click(function() {
+            $("input[id='file']").click();
+        });
+
+        const handleChange = (e) => {
+            file = e.target.files[0];
+            imgElement.src = URL.createObjectURL(e.target.files[0]);
+            textElement.textContent = "";
+        };
+
+        let endTime;
+        let executionTime;
+
+        imgElement.onload = function() {
+            let startTime = performance.now();
+            let src = cv.imread('passport-img');
+            let dst = new cv.Mat();
+
+            let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1280, 720);
+            
+            cv.resize(src, dst, dsize);
+
+            let rgb_planes = new cv.MatVector();
+            cv.split(dst, rgb_planes);
+
+            let result_norm_planes = [];
+
+            for (let i = 0; i < 3; i++) {
+                let plane = rgb_planes.get(i);
+                let dilated_img = new cv.Mat();
+                let dilated_kernel = cv.Mat.ones(7, 7, cv.CV_8U);
+                cv.dilate(plane, dilated_img, dilated_kernel);
+
+                let bg_img = new cv.Mat();
+                cv.medianBlur(dilated_img, bg_img, 21);
+
+                let diff_img = new cv.Mat();
+                cv.absdiff(plane, bg_img, diff_img);
+
+                let scalar = new cv.Mat(plane.rows, plane.cols, plane.type(), new cv.Scalar(255,255,255));
+                cv.subtract(scalar, diff_img, diff_img);
+
+                let norm_img = new cv.Mat();
+                cv.normalize(diff_img, norm_img, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1);
+
+                result_norm_planes.push(norm_img);
+
+                plane.delete();
+                dilated_img.delete();
+                dilated_kernel.delete();
+                bg_img.delete();
+                scalar.delete();
+                diff_img.delete();
+            }
+
+            let result_norm = new cv.Mat();
+
+            let result_norm_vector = new cv.MatVector();
+            for (let i = 0; i < result_norm_planes.length; i++) {
+                result_norm_vector.push_back(result_norm_planes[i]);
+            }
+
+            cv.merge(result_norm_vector, result_norm);
+
+            cv.imshow('adjusted-img', result_norm);
+
+            endTime = performance.now();
+            executionTime = endTime - startTime;
+            console.log(`Image pre-processing time: ${executionTime} milliseconds`);
+
+            startTime = performance.now();
+            Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { langPath: 'model' })
+                    .then(({ data: { text } }) => {
+                        let mrz = getMRZCode(text);
+                        textElement.textContent = mrz.join("\r\n");
+                        autoResizeTextarea(textElement);
+                        endTime = performance.now();
+                        executionTime = endTime - startTime;
+                        console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
+                    });
+
+            src.delete();
+            dst.delete();
+            rgb_planes.delete();
+            result_norm.delete();
+            result_norm_vector.delete();
+            for(let i = 0; i < result_norm_planes.length; i++) {
+                result_norm_planes[i].delete();
+            }
+        };
+
+        // textarea 높이 자동 조절 함수
+        function autoResizeTextarea(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+
+        
+        // 이미지의 크기를 조정하는 함수
+        function getSize(nowWidth, nowHeight, maxWidth, maxHeight) {
+            // 각 비율을 계산해서 이미지가 최대 크기를 넘지 않도록 제한
+            let ratio = 1;
+            let widthRatio = nowWidth > maxWidth ? maxWidth / nowWidth : 1;
+            let heightRatio = nowHeight > maxHeight ? maxHeight / nowHeight : 1;
+
+            ratio = Math.min(widthRatio, heightRatio);
+
+            let width = nowWidth * ratio;
+            let height = nowHeight * ratio;
+
+            return new cv.Size(width, height);
+        }
+
+        function onOpenCvReady() {
+            document.getElementById('status').innerHTML = 'OpenCV.js is ready.';
+        }
+    </script>
+
+    <script async src="js/opencv-4.8.0.min.js" onload="onOpenCvReady();"></script>
+</body>
+</html>

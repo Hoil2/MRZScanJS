@@ -120,95 +120,91 @@
         let executionTime;
 
         imgElement.onload = function() {
-            loadingStart();
-
             try {
-            let startTime = performance.now();
-            let src = cv.imread('passport-img');
-            let dst = new cv.Mat();
+                loadingStart();
+                let startTime = performance.now();
+                let src = cv.imread('passport-img');
+                let dst = new cv.Mat();
 
-            let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1920, 1080);
-            
-            cv.resize(src, dst, dsize);
+                let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1920, 1080);
+                cv.resize(src, dst, dsize);
 
-            let rgb_planes = new cv.MatVector();
-            cv.split(dst, rgb_planes);
+                let rgb_planes = new cv.MatVector();
+                cv.split(dst, rgb_planes);
 
-            let result_norm_planes = [];
+                let result_norm_planes = [];
 
-            for (let i = 0; i < 3; i++) {
-                let plane = rgb_planes.get(i);
-                let dilated_img = new cv.Mat();
-                let dilated_kernel = cv.Mat.ones(7, 7, cv.CV_8U);
-                cv.dilate(plane, dilated_img, dilated_kernel);
+                for (let i = 0; i < 3; i++) {
+                    let plane = rgb_planes.get(i);
+                    let dilated_img = new cv.Mat();
+                    let dilated_kernel = cv.Mat.ones(7, 7, cv.CV_8U);
+                    cv.dilate(plane, dilated_img, dilated_kernel);
 
-                let bg_img = new cv.Mat();
-                cv.medianBlur(dilated_img, bg_img, 21);
+                    let bg_img = new cv.Mat();
+                    cv.medianBlur(dilated_img, bg_img, 21);
 
-                let diff_img = new cv.Mat();
-                cv.absdiff(plane, bg_img, diff_img);
+                    let diff_img = new cv.Mat();
+                    cv.absdiff(plane, bg_img, diff_img);
 
-                let scalar = new cv.Mat(plane.rows, plane.cols, plane.type(), new cv.Scalar(255,255,255));
-                cv.subtract(scalar, diff_img, diff_img);
+                    let scalar = new cv.Mat(plane.rows, plane.cols, plane.type(), new cv.Scalar(255,255,255));
+                    cv.subtract(scalar, diff_img, diff_img);
 
-                let norm_img = new cv.Mat();
-                cv.normalize(diff_img, norm_img, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1);
+                    let norm_img = new cv.Mat();
+                    cv.normalize(diff_img, norm_img, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1);
 
-                result_norm_planes.push(norm_img);
+                    result_norm_planes.push(norm_img);
 
-                plane.delete();
-                dilated_img.delete();
-                dilated_kernel.delete();
-                bg_img.delete();
-                scalar.delete();
-                diff_img.delete();
-            }
+                    plane.delete();
+                    dilated_img.delete();
+                    dilated_kernel.delete();
+                    bg_img.delete();
+                    scalar.delete();
+                    diff_img.delete();
+                }
 
-            let result_norm = new cv.Mat();
+                let result_norm = new cv.Mat();
 
-            let result_norm_vector = new cv.MatVector();
-            for (let i = 0; i < result_norm_planes.length; i++) {
-                result_norm_vector.push_back(result_norm_planes[i]);
-            }
+                let result_norm_vector = new cv.MatVector();
+                for (let i = 0; i < result_norm_planes.length; i++) {
+                    result_norm_vector.push_back(result_norm_planes[i]);
+                }
 
-            cv.merge(result_norm_vector, result_norm);
+                cv.merge(result_norm_vector, result_norm);
 
-            cv.imshow('adjusted-img', result_norm);
+                cv.imshow('adjusted-img', result_norm);
 
-            endTime = performance.now();
-            executionTime = endTime - startTime;
-            console.log(`Image pre-processing time: ${executionTime} milliseconds`);
+                endTime = performance.now();
+                executionTime = endTime - startTime;
+                console.log(`Image pre-processing time: ${executionTime} milliseconds`);
 
-            startTime = performance.now();
-            Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { langPath: 'model' })
-                    .then(({ data: { text } }) => {
-                        try {
-                        console.log(text);
-                        let mrz = getMRZCode(text);
-                        textElement.textContent = mrz.join("\r\n");
-                        autoResizeTextarea(textElement);
-                        generateQrCode(textElement.textContent);
-                        endTime = performance.now();
-                        executionTime = endTime - startTime;
-                        console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
-                        } catch(err) {
-                            alert(err);
-                        } finally {
-                            loadingEnd();
-                        }
-                    });
+                startTime = performance.now();
+                Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { langPath: 'model' })
+                        .then(({ data: { text } }) => {
+                            try {
+                            console.log(text);
+                            let mrz = getMRZCode(text);
+                            textElement.textContent = mrz.join("\r\n");
+                            autoResizeTextarea(textElement);
+                            generateQrCode(textElement.textContent);
+                            endTime = performance.now();
+                            executionTime = endTime - startTime;
+                            console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
+                            } catch(err) {
+                                alert(err);
+                            } finally {
+                                loadingEnd();
+                            }
+                        });
 
-            src.delete();
-            dst.delete();
-            rgb_planes.delete();
-            result_norm.delete();
-            result_norm_vector.delete();
-            for(let i = 0; i < result_norm_planes.length; i++) {
-                result_norm_planes[i].delete();
-            }
+                src.delete();
+                dst.delete();
+                rgb_planes.delete();
+                result_norm.delete();
+                result_norm_vector.delete();
+                for(let i = 0; i < result_norm_planes.length; i++) {
+                    result_norm_planes[i].delete();
+                }
             } catch(err) {
-                alert(err);
-            } finally {
                 loadingEnd();
             }
         };

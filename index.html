@@ -196,16 +196,16 @@
                 Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { langPath: 'model' })
                         .then(({ data: { text } }) => {
                             try {
-                            console.log(text);
-                            let mrz = getMRZCode(text);
-                            textElement.textContent = mrz.join("\r\n");
-                            autoResizeTextarea(textElement);
-                            generateQrCode(textElement.textContent);
-                            endTime = performance.now();
-                            executionTime = endTime - startTime;
-                            console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
+                                console.log(text);
+                                let mrz = getMRZCode(text);
+                                textElement.textContent = mrz.join("\r\n");
+                                autoResizeTextarea(textElement);
+                                generateQrCode(textElement.textContent);
+                                endTime = performance.now();
+                                executionTime = endTime - startTime;
+                                console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
                             } catch(err) {
-                                alert(err);
+                                alert(text);
                             } finally {
                                 loadingEnd();
                             }

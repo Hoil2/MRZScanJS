@@ -61,7 +61,7 @@
             let src = cv.imread('passport-img');
             let dst = new cv.Mat();
 
-            let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1280, 720);
+            let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1920, 1080);
             
             cv.resize(src, dst, dsize);
 
@@ -116,6 +116,7 @@
             startTime = performance.now();
             Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { langPath: 'model' })
                     .then(({ data: { text } }) => {
+                        console.log(text);
                         let mrz = getMRZCode(text);
                         textElement.textContent = mrz.join("\r\n");
                         autoResizeTextarea(textElement);

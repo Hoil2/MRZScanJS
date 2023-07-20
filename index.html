@@ -5,39 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extract MRZ with Tesseract and OpenCV</title>
 
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
     <script src="js/jquery-3.7.0.min.js"></script>
     <!-- v4 -->
     <script src='js/tesseract.min.js'></script>
     <script src="js/mrz-helper.js"></script>
+
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
 </head>
 <body>
-    <div>
-    <p id="status">OpenCV.js is loading...</p>
-        <main className="App-main">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <div style="display: flex; justify-content: center; width: 100%;">
-                    <div style="visibility: hidden; position: fixed;">
-                        <h3>Actual image uploaded</h3>
-                        <div style="width: 100%; border: 1px solid black; text-align: center;">
-                            <img id="passport-img" height="auto" />
-                        </div>
-                    </div>
-                    <div style="width: 100%; padding-left: 5rem; padding-right: 5rem;">
-                        <h3>Adjusted image</h3>
-                        <div id="image" style="width: 100%; border: 1px solid black; text-align: center; cursor: pointer;">
-                            <canvas id="adjusted-img" style="width:fit-content; min-height:500px; height:auto;" ></canvas>
-                        </div>
-                    </div>
+    <main class="container d-flex flex-column align-items-center py-4">
+        <div class="w-100 d-flex justify-content-center">
+            <div class="text-center">
+                <div id="image" class="p-2 border border-dark rounded" style="width: 250px; cursor: pointer;">
+                    <p class="h4"><i class="bi bi-camera-fill me-2"></i>Scan passport</p>
                 </div>
-                <h3>Extracted text</h3>
-                <div class="text-box">
-                    <textarea id="extracted-text" style="width: 350px;"></textarea>
-                </div>
-                <input id="file" type="file" style="display: none;" onChange="handleChange(event)" />
+                <div id="qrcode" class="mt-4 mb-4 d-flex justify-content-center" style="height: 256px"></div>
             </div>
-        </main>
+        </div>
+        <h4 class="mt-3">MRZ</h4>
+        <div class="form-group">
+            <textarea id="extracted-text" class="form-control" style="width: 380px; font-family: monospace; overflow: hidden; resize: none;"></textarea>
+        </div>
+        <input id="file" type="file" class="d-none" onchange="handleChange(event)" />
+    </main>
+
+    <div style="visibility: hidden; position: fixed;">
+        <h3>Actual image uploaded</h3>
+        <div style="width: 100%; border: 1px solid black; text-align: center;">
+            <img id="passport-img" height="auto" />
+            <canvas id="adjusted-img" style="width:fit-content;" ></canvas>
+        </div>
     </div>
+
     <script>
+                
+        function generateQrCode(str) {
+            document.getElementById("qrcode").innerHTML = "";
+            var qrcode = new QRCode(document.getElementById("qrcode"), {
+                text: str,
+                width: 256,
+                height: 256
+            });
+        }
+
         let imgElement = document.getElementById("passport-img");
         let adjustElement = document.getElementById("adjusted-img");
         let textElement = document.getElementById("extracted-text");
@@ -120,6 +133,7 @@
                         let mrz = getMRZCode(text);
                         textElement.textContent = mrz.join("\r\n");
                         autoResizeTextarea(textElement);
+                        generateQrCode(textElement.textContent);
                         endTime = performance.now();
                         executionTime = endTime - startTime;
                         console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
@@ -157,11 +171,13 @@
             return new cv.Size(width, height);
         }
 
-        function onOpenCvReady() {
-            document.getElementById('status').innerHTML = 'OpenCV.js is ready.';
-        }
+        // function onOpenCvReady() {
+        //     document.getElementById('status').innerHTML = 'OpenCV.js is ready.';
+        // }
     </script>
 
-    <script async src="js/opencv-4.8.0.min.js" onload="onOpenCvReady();"></script>
+    <script async src="js/opencv-4.8.0.min.js"></script>
+
+    
 </body>
 </html>

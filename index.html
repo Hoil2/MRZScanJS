@@ -52,6 +52,21 @@
                 transform: rotate(0deg);
             }
         }
+
+        #extracted-text {
+            font-family: monospace;
+            overflow: hidden;
+            resize: none;
+            width: 22rem;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 600px) {
+            #extracted-text {
+                width: 18.5rem;
+                font-size: 0.5rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -68,7 +83,7 @@
         </div>
         <h4 class="mt-3">MRZ</h4>
         <div class="form-group">
-            <textarea id="extracted-text" class="form-control" style="width: 18.5rem; font-size: 0.6rem; font-family: monospace; overflow: hidden; resize: none;"></textarea>
+            <textarea id="extracted-text" class="form-control"></textarea>
         </div>
         <input id="file" type="file" class="d-none" onchange="handleChange(event)" />
     </main>

@@ -111,7 +111,6 @@
         });
 
         const handleChange = (e) => {
-            loadingStart();
             file = e.target.files[0];
             imgElement.src = URL.createObjectURL(e.target.files[0]);
             textElement.textContent = "";
@@ -121,6 +120,9 @@
         let executionTime;
 
         imgElement.onload = function() {
+            loadingStart();
+
+            try {
             let startTime = performance.now();
             let src = cv.imread('passport-img');
             let dst = new cv.Mat();
@@ -203,6 +205,11 @@
             result_norm_vector.delete();
             for(let i = 0; i < result_norm_planes.length; i++) {
                 result_norm_planes[i].delete();
+            }
+            } catch(err) {
+                alert(err);
+            } finally {
+                loadingEnd();
             }
         };
 

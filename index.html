@@ -14,8 +14,49 @@
     <script src="js/mrz-helper.js"></script>
 
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+
+    <style>
+        .loader {
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 16px solid #3498db;
+            width: 120px;
+            height: 120px;
+            animation: spin 2s linear infinite;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            display: none;
+            margin-top: -4.05em;
+            margin-left: -4.05em;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(360deg);
+            }
+            100% {
+                transform: rotate(0deg);
+            }
+        }
+    </style>
 </head>
 <body>
+    <div id="overlay" class="overlay"></div>
+    <div id="loader" class="loader"></div>
     <main class="container d-flex flex-column align-items-center py-4">
         <div class="w-100 d-flex justify-content-center">
             <div class="text-center">
@@ -27,21 +68,30 @@
         </div>
         <h4 class="mt-3">MRZ</h4>
         <div class="form-group">
-            <textarea id="extracted-text" class="form-control" style="width: 18.5rem; font-size: 0.5rem; font-family: monospace; overflow: hidden; resize: none;"></textarea>
+            <textarea id="extracted-text" class="form-control" style="width: 18.5rem; font-size: 0.7rem; font-family: monospace; overflow: hidden; resize: none;"></textarea>
         </div>
         <input id="file" type="file" class="d-none" onchange="handleChange(event)" />
     </main>
-    <img id="passport-img" height="auto" />
+    
     <div style="visibility: hidden; position: fixed;">
         <h3>Actual image uploaded</h3>
         <div style="width: 100%; border: 1px solid black; text-align: center;">
-            
+            <img id="passport-img" height="auto" />
             <canvas id="adjusted-img" style="width:fit-content;" ></canvas>
         </div>
     </div>
 
     <script>
-                
+        function loadingStart() {
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';    
+        }
+
+        function loadingEnd() {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';        
+        }
+
         function generateQrCode(str) {
             document.getElementById("qrcode").innerHTML = "";
             var qrcode = new QRCode(document.getElementById("qrcode"), {
@@ -61,6 +111,7 @@
         });
 
         const handleChange = (e) => {
+            loadingStart();
             file = e.target.files[0];
             imgElement.src = URL.createObjectURL(e.target.files[0]);
             textElement.textContent = "";
@@ -129,6 +180,7 @@
             startTime = performance.now();
             Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { langPath: 'model' })
                     .then(({ data: { text } }) => {
+                        try {
                         console.log(text);
                         let mrz = getMRZCode(text);
                         textElement.textContent = mrz.join("\r\n");
@@ -137,6 +189,11 @@
                         endTime = performance.now();
                         executionTime = endTime - startTime;
                         console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
+                        } catch(err) {
+                            alert(err);
+                        } finally {
+                            loadingEnd();
+                        }
                     });
 
             src.delete();

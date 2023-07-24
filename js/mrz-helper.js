@@ -1,29 +1,31 @@
 let row1Pattern = /P[A-Z0-9<][A-Z]{3}([A-Z0-9<]{39})/g;
+let row1ValidationPattern = /P[A-Z0-9<][A-Z]{3}(?=.*<<)([A-Z0-9<]{39})/g;
 let row2Pattern = /([A-Z0-9][A-Z0-9<]{8})[0-9]([A-Z]{3})([0-9]{6})[0-9][MF<]([0-9]{6})[0-9][A-Z0-9<]{14}[0-9<][0-9]/g;
 
 function getMRZCode(ocrText) {
     let result = [];
-    let ocrTextList = ocrText.split("\n");
-    let index = ocrTextList.length - 1;
+
+    ocrText = ocrText.replace(/\s/g, "");
 
     // 2번째 줄의 MRZ 찾기
-    for (let i = index; i >= 0; i--) {
-        let row2 = ocrTextList[i].match(row2Pattern);
+    let row2 = ocrText.match(row2Pattern);
 
-        if (row2 != null) {
-            result[1] = row2[0];
-            index = i;
-            break;
-        }
+    if (row2 != null) {
+        result[1] = row2[0];
+        let matchIndex = ocrText.indexOf(row2[0]);
+        ocrText = ocrText.substring(0, matchIndex);
     }
 
     // 1번째 줄의 MRZ 찾기
     if (result[1] != undefined) {
-        for(let j = index - 1;  j >= 0; j--) {
-            let row1 = ocrTextList[j].match(row1Pattern);
-            
-            if(row1 != null) {
-                result[0] = row1[0];
+        let row1 = ocrText.match(row1Pattern);
+        
+        if(row1 != null) {
+            for(let i = row1.length - 1; i >= 0; i--) {
+                if(row1[i].match(row1ValidationPattern) != null) {
+                    result[0] = row1[i];
+                    break;
+                }
             }
         }
     }

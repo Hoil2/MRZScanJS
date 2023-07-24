@@ -128,7 +128,7 @@
         const handleChange = (e) => {
             file = e.target.files[0];
             imgElement.src = URL.createObjectURL(e.target.files[0]);
-            textElement.textContent = "";
+            textElement.value = "";
         };
 
         let endTime;
@@ -198,9 +198,9 @@
                             try {
                                 console.log(text);
                                 let mrz = getMRZCode(text);
-                                textElement.textContent = mrz.join("\r\n");
+                                textElement.value = mrz.join("\r\n");
                                 autoResizeTextarea(textElement);
-                                generateQrCode(textElement.textContent);
+                                generateQrCode(textElement.value);
                                 endTime = performance.now();
                                 executionTime = endTime - startTime;
                                 console.log(`Tesseract ocr time: ${executionTime} milliseconds`);

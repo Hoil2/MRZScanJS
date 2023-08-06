@@ -87,12 +87,12 @@
         </div>
         <input id="file" type="file" class="d-none" onchange="handleChange(event)" />
     </main>
-    <canvas id="adjusted-img" style="width:fit-content;" ></canvas>
+    <canvas id="adjusted-img" style="width:fit-content;" ></canvas>    
     <div style="visibility: hidden; position: fixed;">
         <h3>Actual image uploaded</h3>
         <div style="width: 100%; border: 1px solid black; text-align: center;">
             <img id="passport-img" height="auto" />
-            
+            <canvas id="adjusted-img" style="width:fit-content;" ></canvas>        
         </div>
     </div>
 
@@ -131,29 +131,7 @@
         const handleChange = (e) => {
             startTime = performance.now();
             let file = e.target.files[0];
-            
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                let img = document.createElement('img');
-                img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                let scale = Math.min(1, 1200 / img.width);
-                canvas.width = img.width * scale;
-                canvas.height = img.height * scale;
-                
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                canvas.toBlob((blob) => {
-                    imgElement.src = URL.createObjectURL(blob);
-                }, file.type);
-                };
-                
-                img.src = reader.result;
-            };
-            
-            reader.readAsDataURL(file);
+            imgElement.src = URL.createObjectURL(file);
             textElement.value = "";
         };
 
@@ -165,7 +143,7 @@
                 let src = cv.imread('passport-img');
                 let dst = new cv.Mat();
 
-                let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1200, 1200);
+                let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1600);
                 cv.resize(src, dst, dsize);
 
                 let rgb_planes = new cv.MatVector();
@@ -210,36 +188,64 @@
 
                 cv.merge(result_norm_vector, result_norm);
 
-                cv.imshow('adjusted-img', result_norm);
+                // 전처리 추가
+                // 이미지를 RGB로 변환
+                let img_rgb = new cv.Mat();
+                cv.cvtColor(result_norm, img_rgb, cv.COLOR_BGR2RGB);
+
+                // GaussianBlur를 사용하여 이미지 블러링
+                let blurred = new cv.Mat();
+                let ksize = new cv.Size(0, 0);
+                cv.GaussianBlur(img_rgb, blurred, ksize, 3, 3, cv.BORDER_DEFAULT);
+
+                // sharpened 이미지 생성
+                let sharpened = new cv.Mat();
+                let alpha = 2.5;
+                let beta = -1.5;
+                let gamma = 0;
+                cv.addWeighted(img_rgb, alpha, blurred, beta, gamma, sharpened);
+
+                // 다시 BGR 형태로 변환
+                let img_bgr = new cv.Mat();
+                cv.cvtColor(sharpened, img_bgr, cv.COLOR_RGB2BGR);
+
+                let bilateralFilterImg = new cv.Mat();
+                cv.bilateralFilter(img_bgr, bilateralFilterImg, 9, 150, 5, cv.BORDER_DEFAULT);
+
+                cv.imshow('adjusted-img', bilateralFilterImg);
 
                 endTime = performance.now();
                 executionTime = endTime - startTime;
                 console.log(`Image pre-processing time: ${executionTime} milliseconds`);
 
                 startTime = performance.now();
-                Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { langPath: 'model' })
-                        .then(({ data }) => {
+                Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { 
+                    langPath: 'model'
+                }).then(({ data }) => {
                             try {
                                 // 문자의 위치 정보를 포함하는 배열을 만듭니다.
                                 let textRanges = data.lines.map(line => ({
                                     text: line.text,
                                     bbox: line.bbox
                                 }));
-                                
-                                //console.log(getCombinedBbox(textRanges));
+                                console.log(textRanges);
+                                textRanges = textRanges.filter(item => item.text.replace(/\s/g, '').length >= 44);
+                                console.log(textRanges);
+                                let mrz = getMRZCode(textRanges);
+                                console.log(mrz);
+                                if(mrz[1] != null) {
+                                    if(mrz[0] != null) {
+                                        textElement.value = mrz.join("\r\n");
+                                    } else {
+                                        console.log("can't find mrz1");
+                                    }
+                                }
 
-                                // 위에서 정의한 함수를 사용해 부분 이미지에 대해 OCR을 수행합니다.
-                                recognizePartOfImage(getCombinedBbox(textRanges)).then(({ data }) => {
-                                    // 여기에 결과를 처리하는 코드를 작성합니다.
-                                    console.log(data.text);
-                                });
-                                // let mrz = getMRZCode(textRanges);
-                                // textElement.value = mrz.join("\r\n");
-                                // autoResizeTextarea(textElement);
-                                // generateQrCode(textElement.value);
-                                // endTime = performance.now();
-                                // executionTime = endTime - startTime;
-                                // console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
+                                autoResizeTextarea(textElement);
+                                generateQrCode(textElement.value);
+                                endTime = performance.now();
+                                executionTime = endTime - startTime;
+                                console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
                             } catch(err) {
                                 alert(err);
                             } finally {
@@ -247,6 +253,7 @@
                             }
                         });
 
+                // 사용이 끝난 Mat 객체 메모리 해제
                 src.delete();
                 dst.delete();
                 rgb_planes.delete();
@@ -255,6 +262,11 @@
                 for(let i = 0; i < result_norm_planes.length; i++) {
                     result_norm_planes[i].delete();
                 }
+                img_rgb.delete();
+                blurred.delete();
+                sharpened.delete();
+                img_bgr.delete();
+                bilateralFilterImg.delete();
             } catch(err) {
                 loadingEnd();
             }
@@ -314,18 +326,29 @@
 
         
         // 이미지의 크기를 조정하는 함수
-        function getSize(nowWidth, nowHeight, maxWidth, maxHeight) {
-            // 각 비율을 계산해서 이미지가 최대 크기를 넘지 않도록 제한
+        function getSize(nowWidth, nowHeight, dimension) {
             let ratio = 1;
-            let widthRatio = nowWidth > maxWidth ? maxWidth / nowWidth : 1;
-            let heightRatio = nowHeight > maxHeight ? maxHeight / nowHeight : 1;
 
-            ratio = Math.min(widthRatio, heightRatio);
+            // 더 큰 쪽의 크기를 기준으로 비율 계산
+            if (nowWidth >= nowHeight) {
+                ratio = dimension / nowWidth;
+            } else {
+                ratio = dimension / nowHeight;
+            }
+            ratio = (ratio > 1) ? 1 : ratio;
+            // 계산된 비율로 변경하려고 할 때, 이미지 크기가 50% 이상 커지는 경우
+            // if (ratio > 1.5) {
+            //     ratio = 1.5;
+            // }
+            // // 계산된 비율로 변경하려고 할 때, 이미지 크기가 50% 이하로 작아지는 경우
+            // else if (ratio < 0.5) {
+            //     ratio = 0.5;
+            // }
 
             let width = nowWidth * ratio;
             let height = nowHeight * ratio;
 
-            return new cv.Size(width, height);
+            return new cv.Size(Math.round(width), Math.round(height));
         }
 
         function getCombinedBbox(textRanges) {

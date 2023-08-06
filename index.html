@@ -141,7 +141,7 @@
                 let src = cv.imread('passport-img');
                 let dst = new cv.Mat();
 
-                let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1200, 1200);
+                let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1280, 1280);
                 cv.resize(src, dst, dsize);
 
                 let rgb_planes = new cv.MatVector();

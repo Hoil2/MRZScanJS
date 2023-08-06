@@ -1,5 +1,5 @@
-let row1Pattern = /P[A-Z0-9<][A-Z]{3}([A-Z0-9<]{39})/g;
-let row2Pattern = /([A-Z0-9][A-Z0-9<]{8})[0-9]([A-Z]{3})([0-9]{6})[0-9][MF<]([0-9]{6})[0-9][A-Z0-9<]{14}[0-9<][0-9]/g;
+let row1Pattern = /P[A-Z0-9<][A-Z<]{3}([A-Z0-9<]{39})/g;
+let row2Pattern = /([A-Z0-9][A-Z0-9<]{8})[0-9]([A-Z<]{3})([0-9]{6})[0-9][MF<]([0-9]{6})[0-9][A-Z0-9<]{14}[0-9<][0-9]/g;
 
 function getMRZCode(ocrText) {
     let result = [];
@@ -24,6 +24,7 @@ function getMRZCode(ocrText) {
             
             if(row1 != null) {
                 result[0] = row1[0];
+                break;
             }
         }
     }

@@ -60,6 +60,7 @@
         const EXTRACTED_TEXT_ID = 'extracted-text';
         const FILE_INPUT_ID = 'file';
         const IMAGE_DIV_ID = 'image';
+        const MODEL_DIR_PATH = 'model';
 
         // 로딩 관련 함수
         function loadingStart() {
@@ -94,7 +95,8 @@
         // 이미지 로드 완료 이벤트 핸들러
         function handleImageLoaded() {
             loadingStart();
-            MRZScanner.extractMRZ(PASSPORT_IMG_ID).then(mrz => {
+            const mrzScanner = new MRZScanner(MODEL_DIR_PATH);
+            mrzScanner.extractMRZ(PASSPORT_IMG_ID).then(mrz => {
                 const textElement = document.getElementById(EXTRACTED_TEXT_ID);
                 textElement.value = mrz.join("\n");
                 generateQrCode(textElement.value);

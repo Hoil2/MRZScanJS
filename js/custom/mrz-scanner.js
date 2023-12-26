@@ -3,7 +3,11 @@ class MRZScanner {
     static row1Pattern = /P[A-Z0-9<][A-Z<]{3}([A-Z0-9<]{39})/g;
     static row2Pattern = /([A-Z0-9][A-Z0-9<]{8})[0-9]([A-Z<]{3})([0-9]{6})[0-9][MF<]([0-9]{6})[0-9][A-Z0-9<]{14}[0-9<][0-9]/g;
 
-    static async extractMRZ(id) {
+    constructor(modelDirPath) {
+        this.modelDirPath = modelDirPath;
+    }
+
+    async extractMRZ(id) {
         const imgElement = document.getElementById(id);
         if (!imgElement) {
             console.error('Image element not found.');
@@ -22,7 +26,7 @@ class MRZScanner {
         }
     }
 
-    static async processImage(imgElement) {
+    async processImage(imgElement) {
         let src, dst, dsize, rgb_planes, result_norm_planes, result_norm, result_norm_vector, img_rgb, blurred, ksize, sharpened, img_bgr, bilateralFilterImg, adjustedImgElement;
         
         try {
@@ -100,8 +104,10 @@ class MRZScanner {
             // 이미지를 임시 캔버스에 그리
             cv.imshow('adjusted-img', bilateralFilterImg);
 
+            console.log(this.modelDirPath);
+
             // Tesseract OCR 처리
-            const { data } = await Tesseract.recognize(adjustedImgElement.toDataURL(), 'mrz', { langPath: 'model' });
+            const { data } = await Tesseract.recognize(adjustedImgElement.toDataURL(), 'mrz', { langPath: this.modelDirPath });
 
             // 결과 처리
             let textRanges = data.lines.map(line => ({
@@ -133,7 +139,7 @@ class MRZScanner {
     }
 
     // 이미지의 크기를 조정하는 함수
-    static getSize(nowWidth, nowHeight, dimension) {
+    getSize(nowWidth, nowHeight, dimension) {
         let ratio = 1;
 
         // 더 큰 쪽의 크기를 기준으로 비율 계산
@@ -150,7 +156,7 @@ class MRZScanner {
         return new cv.Size(Math.round(width), Math.round(height));
     }
 
-    static getMRZCode(textRanges) {
+    getMRZCode(textRanges) {
         let result = [];
         let index = textRanges.length - 1;
         

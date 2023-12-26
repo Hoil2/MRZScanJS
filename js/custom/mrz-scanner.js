@@ -104,8 +104,6 @@ class MRZScanner {
             // 이미지를 임시 캔버스에 그리
             cv.imshow('adjusted-img', bilateralFilterImg);
 
-            console.log(this.modelDirPath);
-
             // Tesseract OCR 처리
             const { data } = await Tesseract.recognize(adjustedImgElement.toDataURL(), 'mrz', { langPath: this.modelDirPath });
 

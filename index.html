@@ -4,74 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extract MRZ with Tesseract and OpenCV</title>
+    
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css"/>
+    <!-- External CSS -->
+    <link rel="stylesheet" href="css/external/bootstrap/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
-    <script src="js/jquery-3.7.0.min.js"></script>
-    <!-- v4 -->
-    <script src='js/tesseract.min.js'></script>
-    <script src="js/mrz-helper.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/custom/mycss.css">
 
-    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <!-- External JS -->
+    <script src='js/external/tesseract-4.1.4.min.js'></script> 
+    <script src="js/external/davidshimjs-qrcode-0.0.2.min.js"></script>
+    <script src="js/external/opencv-4.8.0.min.js"></script>
 
-    <style>
-        .loader {
-            border: 16px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 16px solid #3498db;
-            width: 120px;
-            height: 120px;
-            animation: spin 2s linear infinite;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 9999;
-            display: none;
-            margin-top: -4.05em;
-            margin-left: -4.05em;
-        }
-
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 9998;
-            display: none;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(360deg);
-            }
-            100% {
-                transform: rotate(0deg);
-            }
-        }
-
-        #extracted-text {
-            font-family: monospace;
-            overflow: hidden;
-            resize: none;
-            width: 22rem;
-            font-size: 0.9rem;
-        }
-
-        @media (max-width: 600px) {
-            #extracted-text {
-                width: 18.5rem;
-                font-size: 0.6rem;
-            }
-        }
-    </style>
+    <!-- Custom JS -->
+    <script src="js/custom/mrz-scanner.js"></script>
+    
 </head>
 <body>
     <div id="overlay" class="overlay"></div>
     <div id="loader" class="loader"></div>
+
     <main class="container d-flex flex-column align-items-center py-4">
         <div class="w-100 d-flex justify-content-center">
             <div class="text-center">
@@ -85,305 +40,87 @@
         <div class="form-group">
             <textarea id="extracted-text" class="form-control"></textarea>
         </div>
-        <input id="file" type="file" class="d-none" onchange="handleChange(event)" />
+        <input id="file" type="file" class="d-none" />
     </main>
     
+    <!-- Hidden fields -->
     <div style="visibility: hidden; position: fixed;">
         <h3>Actual image uploaded</h3>
         <div style="width: 100%; border: 1px solid black; text-align: center;">
             <img id="passport-img" height="auto" />
-            <canvas id="adjusted-img" style="width:fit-content;" ></canvas>        
         </div>
     </div>
 
     <script>
+        // 상수 정의
+        const LOADER_ID = 'loader';
+        const OVERLAY_ID = 'overlay';
+        const QR_CODE_ID = 'qrcode';
+        const PASSPORT_IMG_ID = 'passport-img';
+        const EXTRACTED_TEXT_ID = 'extracted-text';
+        const FILE_INPUT_ID = 'file';
+        const IMAGE_DIV_ID = 'image';
+
+        // 로딩 관련 함수
         function loadingStart() {
-            document.getElementById('loader').style.display = 'block';
-            document.getElementById('overlay').style.display = 'block';    
+            document.getElementById(LOADER_ID).style.display = 'block';
+            document.getElementById(OVERLAY_ID).style.display = 'block';    
         }
 
         function loadingEnd() {
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('overlay').style.display = 'none';        
+            document.getElementById(LOADER_ID).style.display = 'none';
+            document.getElementById(OVERLAY_ID).style.display = 'none';        
         }
 
-        function generateQrCode(str) {
-            document.getElementById("qrcode").innerHTML = "";
-            var qrcode = new QRCode(document.getElementById("qrcode"), {
-                text: str,
+        // QR 코드 생성 함수
+        function generateQrCode(text) {
+            const qrCodeContainer = document.getElementById(QR_CODE_ID);
+            qrCodeContainer.innerHTML = "";
+            new QRCode(qrCodeContainer, {
+                text: text,
                 width: 256,
                 height: 256
             });
         }
 
-        let imgElement = document.getElementById("passport-img");
-        let adjustElement = document.getElementById("adjusted-img");
-        let textElement = document.getElementById("extracted-text");
-
-        $("div[id='image']").click(function() {
-            $("input[id='file']").click();
-        });
-
-        let startTime;
-        let endTime;
-        let executionTime;
-
-        const handleChange = (e) => {
-            startTime = performance.now();
-            let file = e.target.files[0];
+        // 이미지 업로드 이벤트 핸들러
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            const imgElement = document.getElementById(PASSPORT_IMG_ID);
             imgElement.src = URL.createObjectURL(file);
-            textElement.value = "";
-        };
-
-        
-        
-        imgElement.onload = function() {
-            try {
-                loadingStart();
-                let src = cv.imread('passport-img');
-                let dst = new cv.Mat();
-
-                let dsize = getSize(imgElement.naturalWidth, imgElement.naturalHeight, 1600);
-                cv.resize(src, dst, dsize);
-
-                let rgb_planes = new cv.MatVector();
-                cv.split(dst, rgb_planes);
-
-                let result_norm_planes = [];
-
-                for (let i = 0; i < 3; i++) {
-                    let plane = rgb_planes.get(i);
-                    let dilated_img = new cv.Mat();
-                    let dilated_kernel = cv.Mat.ones(7, 7, cv.CV_8U);
-                    cv.dilate(plane, dilated_img, dilated_kernel);
-
-                    let bg_img = new cv.Mat();
-                    cv.medianBlur(dilated_img, bg_img, 21);
-
-                    let diff_img = new cv.Mat();
-                    cv.absdiff(plane, bg_img, diff_img);
-
-                    let scalar = new cv.Mat(plane.rows, plane.cols, plane.type(), new cv.Scalar(255,255,255));
-                    cv.subtract(scalar, diff_img, diff_img);
-
-                    let norm_img = new cv.Mat();
-                    cv.normalize(diff_img, norm_img, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1);
-
-                    result_norm_planes.push(norm_img);
-
-                    plane.delete();
-                    dilated_img.delete();
-                    dilated_kernel.delete();
-                    bg_img.delete();
-                    scalar.delete();
-                    diff_img.delete();
-                }
-
-                let result_norm = new cv.Mat();
-
-                let result_norm_vector = new cv.MatVector();
-                for (let i = 0; i < result_norm_planes.length; i++) {
-                    result_norm_vector.push_back(result_norm_planes[i]);
-                }
-
-                cv.merge(result_norm_vector, result_norm);
-
-                // 전처리 추가
-                // 이미지를 RGB로 변환
-                let img_rgb = new cv.Mat();
-                cv.cvtColor(result_norm, img_rgb, cv.COLOR_BGR2RGB);
-
-                // GaussianBlur를 사용하여 이미지 블러링
-                let blurred = new cv.Mat();
-                let ksize = new cv.Size(0, 0);
-                cv.GaussianBlur(img_rgb, blurred, ksize, 3, 3, cv.BORDER_DEFAULT);
-
-                // sharpened 이미지 생성
-                let sharpened = new cv.Mat();
-                let alpha = 2.5;
-                let beta = -1.5;
-                let gamma = 0;
-                cv.addWeighted(img_rgb, alpha, blurred, beta, gamma, sharpened);
-
-                // 다시 BGR 형태로 변환
-                let img_bgr = new cv.Mat();
-                cv.cvtColor(sharpened, img_bgr, cv.COLOR_RGB2BGR);
-
-                let bilateralFilterImg = new cv.Mat();
-                cv.bilateralFilter(img_bgr, bilateralFilterImg, 9, 150, 5, cv.BORDER_DEFAULT);
-
-                cv.imshow('adjusted-img', bilateralFilterImg);
-
-                endTime = performance.now();
-                executionTime = endTime - startTime;
-                console.log(`Image pre-processing time: ${executionTime} milliseconds`);
-
-                startTime = performance.now();
-                Tesseract.recognize(adjustElement.toDataURL(), 'mrz', { 
-                    langPath: 'model'
-                }).then(({ data }) => {
-                            try {
-                                // 문자의 위치 정보를 포함하는 배열을 만듭니다.
-                                let textRanges = data.lines.map(line => ({
-                                    text: line.text,
-                                    bbox: line.bbox
-                                }));
-                                console.log(textRanges);
-                                textRanges = textRanges.filter(item => item.text.replace(/\s/g, '').length >= 44);
-                                console.log(textRanges);
-                                let mrz = getMRZCode(textRanges);
-                                console.log(mrz);
-                                if(mrz[1] != null) {
-                                    if(mrz[0] != null) {
-                                        textElement.value = mrz.join("\r\n");
-                                    } else {
-                                        console.log("can't find mrz1");
-                                    }
-                                }
-
-                                autoResizeTextarea(textElement);
-                                generateQrCode(textElement.value);
-                                endTime = performance.now();
-                                executionTime = endTime - startTime;
-                                console.log(`Tesseract ocr time: ${executionTime} milliseconds`);
-                            } catch(err) {
-                                alert(err);
-                            } finally {
-                                loadingEnd();
-                            }
-                        });
-
-                // 사용이 끝난 Mat 객체 메모리 해제
-                src.delete();
-                dst.delete();
-                rgb_planes.delete();
-                result_norm.delete();
-                result_norm_vector.delete();
-                for(let i = 0; i < result_norm_planes.length; i++) {
-                    result_norm_planes[i].delete();
-                }
-                img_rgb.delete();
-                blurred.delete();
-                sharpened.delete();
-                img_bgr.delete();
-                bilateralFilterImg.delete();
-            } catch(err) {
-                loadingEnd();
-            }
-        };
-
-        function recognizePartOfImage(bbox) {
-            const dimension = 1200;
-
-            const ctx = adjustElement.getContext('2d');
-
-            // 원본 이미지의 선택된 부분을 임시 이미지로 저장합니다.
-            const tempImage = ctx.getImageData(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-
-            // 선택된 부분의 크기와 최대 크기를 계산합니다.
-            const originalWidth = bbox.x1 - bbox.x0;
-            const originalHeight = bbox.y1 - bbox.y0;
-            const aspectRatio = originalWidth / originalHeight;
-            
-            let newWidth = originalWidth;
-            let newHeight = originalHeight;
-
-            // 가로 세로 비율을 유지하면서 크기를 조정합니다.
-            if (originalWidth > originalHeight) {
-                newWidth = dimension;
-                newHeight = dimension / aspectRatio;
-            } else {
-                newHeight = dimension;
-                newWidth = dimension * aspectRatio;
-            }
-
-            // 임시 캔버스를 생성하고 ImageData를 그립니다.
-            let tempCanvas = document.createElement('canvas');
-            let tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = originalWidth;
-            tempCanvas.height = originalHeight;
-            tempCtx.putImageData(tempImage, 0, 0);
-
-            // 캔버스 크기를 선택된 부분의 크기로 조정합니다.
-            adjustElement.width = newWidth;
-            adjustElement.height = newHeight;
-
-            // 임시 캔버스에 그려진 이미지를 선택된 부분에 그립니다.
-            ctx.drawImage(tempCanvas, 0, 0, newWidth, newHeight);
-
-            // 캔버스의 내용을 데이터 URL로 변환합니다.
-            const imageUrl = adjustElement.toDataURL();
-
-            // Tesseract.js를 사용해 OCR을 수행합니다.
-            return Tesseract.recognize(imageUrl, 'mrz', { langPath: 'model' });
+            document.getElementById(EXTRACTED_TEXT_ID).value = "";
         }
 
-        // textarea 높이 자동 조절 함수
+        // 이미지 로드 완료 이벤트 핸들러
+        function handleImageLoaded() {
+            loadingStart();
+            MRZScanner.extractMRZ(PASSPORT_IMG_ID).then(mrz => {
+                const textElement = document.getElementById(EXTRACTED_TEXT_ID);
+                textElement.value = mrz.join("\n");
+                generateQrCode(textElement.value);
+                autoResizeTextarea(textElement);
+                loadingEnd();
+            }).catch(error => {
+                console.error("Error extracting MRZ: ", error);
+                loadingEnd();
+            });
+        }
+
+        // 텍스트 영역 자동 크기 조절 함수
         function autoResizeTextarea(textarea) {
             textarea.style.height = 'auto';
             textarea.style.height = `${textarea.scrollHeight}px`;
         }
 
-        
-        // 이미지의 크기를 조정하는 함수
-        function getSize(nowWidth, nowHeight, dimension) {
-            let ratio = 1;
+        // 이벤트 리스너 설정
+        document.getElementById(IMAGE_DIV_ID).addEventListener('click', () => {
+            document.getElementById(FILE_INPUT_ID).click();
+        });
 
-            // 더 큰 쪽의 크기를 기준으로 비율 계산
-            if (nowWidth >= nowHeight) {
-                ratio = dimension / nowWidth;
-            } else {
-                ratio = dimension / nowHeight;
-            }
-            ratio = (ratio > 1) ? 1 : ratio;
-            // 계산된 비율로 변경하려고 할 때, 이미지 크기가 50% 이상 커지는 경우
-            // if (ratio > 1.5) {
-            //     ratio = 1.5;
-            // }
-            // // 계산된 비율로 변경하려고 할 때, 이미지 크기가 50% 이하로 작아지는 경우
-            // else if (ratio < 0.5) {
-            //     ratio = 0.5;
-            // }
+        document.getElementById(FILE_INPUT_ID).addEventListener('change', handleImageUpload);
+        document.getElementById(PASSPORT_IMG_ID).addEventListener('load', handleImageLoaded);
 
-            let width = nowWidth * ratio;
-            let height = nowHeight * ratio;
-
-            return new cv.Size(Math.round(width), Math.round(height));
-        }
-
-        function getCombinedBbox(textRanges) {
-            //console.log(textRanges);
-            let padding = 10;
-            // 공백 제거 후 길이가 44 이상인 요소만 남깁니다.
-            textRanges = textRanges.filter(item => item.text.replace(/\s/g, '').length >= 44);
-            console.log(textRanges);
-            // ">>"를 포함하는 요소를 찾습니다.
-            for (let i = 0; i < textRanges.length; i++) {
-                if (textRanges[i].text.includes("<<")) {
-                    // 해당 요소와 그 다음 요소를 반환합니다.
-                    let bbox1 = textRanges[i].bbox;
-                    let bbox2 = textRanges[i + 1].bbox;
-
-                    return {
-                        x0: Math.max(0, Math.min(bbox1.x0, bbox2.x0) - padding),
-                        y0: Math.max(0, Math.min(bbox1.y0, bbox2.y0) - padding),
-                        x1: Math.min(adjustElement.width, Math.max(bbox1.x1, bbox2.x1) + padding),
-                        y1: Math.min(adjustElement.height, Math.max(bbox1.y1, bbox2.y1) + padding)
-                    };
-                }
-            }
-
-            // ">>"를 포함하는 요소가 없는 경우 null을 반환합니다.
-            return null;
-        }
-
-        // function onOpenCvReady() {
-        //     document.getElementById('status').innerHTML = 'OpenCV.js is ready.';
-        // }
     </script>
 
-    <script async src="js/opencv-4.8.0.min.js"></script>
-
-    
 </body>
 </html>
